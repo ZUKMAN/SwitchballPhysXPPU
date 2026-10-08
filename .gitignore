@@ -1,0 +1,11 @@
+# build output
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
+PhysXLoader.dll
+test284/test284.exe
+# runtime files
+*.log
+PhysX284/
