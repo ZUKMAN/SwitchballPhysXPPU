@@ -16,6 +16,9 @@ int                 g_hwMode = 1;
 int                 g_jointKeepSleep = 1, g_logJoints = 0, g_trackActors = 0, g_jointProjection = -1;
 static float        g_trackBox[6]; static int g_trackBoxOn;
 float               g_frictionScale = 1.0f; int g_coneFriction = 0;
+float               g_staticFrictionScale = 1.0f;   /* extra factor for static friction only */
+static float        g_skinWidth = -1.0f;            /* -1 = as the game sets it (0.001) */
+static int          g_bodySolverIter = 0;           /* 0 = as the game sets it */
 static float        g_adaptiveForce = -1.0f, g_jointExtrapolation = 1.0f, g_ropeLoadMassScale = 1.0f;
 static float        g_ropeSettleSeconds = 10.0f, g_settleAdaptive = 0.0f, g_defaultAdaptive = 1.0f;
 static double       g_settleUntil;            /* GetTickCount() time until which the settle mode runs */
@@ -191,6 +194,9 @@ static void *FC sc_createActor(void *t, EDX, const ActorDesc25 *d)
             ad.shapes.pushBack(sd);
         }
     if (g_coneFriction) ad.flags |= NX_AF_FORCE_CONE_FRICTION;
+    /* more solver iterations for moving bodies: calmer contacts for multi-shape boxes */
+    if (d->body && g_bodySolverIter > 0 && bd.solverIterationCount < (NxU32)g_bodySolverIter)
+        bd.solverIterationCount = (NxU32)g_bodySolverIter;
     NxActor *a = self->s->createActor(ad);
     if (!a) {
         B2Log("scene.createActor FAILED: %u shapes, body %p, density %f, desc valid %d",
@@ -308,13 +314,13 @@ static void FC sc_releaseJoint(void *t, EDX, WJoint *j)
 static void *FC sc_createMaterial(void *t, EDX, const MaterialDesc25 *d)
 {
     NxMaterialDesc o; Material25To28(d, o);
-    o.staticFriction *= g_frictionScale; o.dynamicFriction *= g_frictionScale;
-    o.staticFrictionV *= g_frictionScale; o.dynamicFrictionV *= g_frictionScale;
+    o.staticFriction *= g_frictionScale * g_staticFrictionScale; o.dynamicFriction *= g_frictionScale;
+    o.staticFrictionV *= g_frictionScale * g_staticFrictionScale; o.dynamicFrictionV *= g_frictionScale;
     NxMaterial *m = SC(t)->createMaterial(o);
     B2Log("createMaterial -> index %u: static %.3f dynamic %.3f restitution %.3f (V %.3f/%.3f) flags 0x%X combine friction %u restitution %u%s",
           m ? m->getMaterialIndex() : 0xFFFF, d->staticFriction, d->dynamicFriction, d->restitution,
           d->staticFrictionV, d->dynamicFrictionV, d->flags, d->frictionCombineMode, d->restitutionCombineMode,
-          g_frictionScale != 1.0f ? "  (friction scaled)" : "");
+          (g_frictionScale != 1.0f || g_staticFrictionScale != 1.0f) ? "  (friction scaled)" : "");
     return MaterialWrapper((WScene *)t, m);
 }
 
@@ -460,6 +466,12 @@ static NxU32 FC sdk_setParameter(void *t, EDX, NxU32 p, NxReal v)
 {
     bool ok; NxParameter q = Param25To28(p, &ok); (void)t;
     if (!ok) { B2LogOnce("param", "setParameter(%u) not mapped - ignored", p); return 1; }
+    /* Switchball sets NX_SKIN_WIDTH 0.001; 2.8's contact generation can flicker with such
+       a thin skin (resting/pushed boxes stutter). SkinWidth overrides it. */
+    if (q == NX_SKIN_WIDTH && g_skinWidth >= 0) {
+        B2LogOnce("skin", "setParameter(NX_SKIN_WIDTH %.4f) -> %.4f (ini SkinWidth)", v, g_skinWidth);
+        v = g_skinWidth;
+    }
     return g_sdk->setParameter(q, v);
 }
 static float FC sdk_getParameter(void *t, EDX, NxU32 p)
@@ -706,6 +718,9 @@ static void B2Init()
             GetPrivateProfileStringA("SwitchballPhysXPPU", "FrictionScale", "1.0", b, sizeof(b), ini);
             g_frictionScale = (float)atof(b);
             g_coneFriction = GetPrivateProfileIntA("SwitchballPhysXPPU", "ConeFriction", 0, ini);
+            GetPrivateProfileStringA("SwitchballPhysXPPU", "StaticFrictionScale", "1.0", b, sizeof(b), ini); g_staticFrictionScale = (float)atof(b);
+            GetPrivateProfileStringA("SwitchballPhysXPPU", "SkinWidth", "-1", b, sizeof(b), ini);         g_skinWidth = (float)atof(b);
+            g_bodySolverIter = GetPrivateProfileIntA("SwitchballPhysXPPU", "BodySolverIterations", 0, ini);
             GetPrivateProfileStringA("SwitchballPhysXPPU", "AdaptiveForce", "-1", b, sizeof(b), ini);      g_adaptiveForce = (float)atof(b);
             GetPrivateProfileStringA("SwitchballPhysXPPU", "JointExtrapolation", "1.0", b, sizeof(b), ini); g_jointExtrapolation = (float)atof(b);
             GetPrivateProfileStringA("SwitchballPhysXPPU", "RopeLoadMassScale", "1.0", b, sizeof(b), ini);  g_ropeLoadMassScale = (float)atof(b);

@@ -115,10 +115,10 @@ static NxU16 FC mt_getIndex(void *t, EDX)                 { return MAT(t)->getMa
 static void  FC mt_load(void *t, EDX, MaterialDesc25 *d)  { NxMaterialDesc o; Material25To28(d, o); MAT(t)->loadFromDesc(o); }
 static void  FC mt_save(void *t, EDX, MaterialDesc25 *d)  { NxMaterialDesc o; MAT(t)->saveToDesc(o); Material28To25(o, d); }
 static void *FC mt_getScene(void *t, EDX)                 { return ((WMaterial *)t)->scene; }
-extern float g_frictionScale;
+extern float g_frictionScale, g_staticFrictionScale;
 static void  FC mt_setDynF(void *t, EDX, NxReal v)        { MAT(t)->setDynamicFriction(v * g_frictionScale); B2Log("material %u setDynamicFriction(%.3f)", MAT(t)->getMaterialIndex(), v); }
 static float FC mt_getDynF(void *t, EDX)                  { return MAT(t)->getDynamicFriction(); }
-static void  FC mt_setStaF(void *t, EDX, NxReal v)        { MAT(t)->setStaticFriction(v * g_frictionScale); B2Log("material %u setStaticFriction(%.3f)", MAT(t)->getMaterialIndex(), v); }
+static void  FC mt_setStaF(void *t, EDX, NxReal v)        { MAT(t)->setStaticFriction(v * g_frictionScale * g_staticFrictionScale); B2Log("material %u setStaticFriction(%.3f)", MAT(t)->getMaterialIndex(), v); }
 static float FC mt_getStaF(void *t, EDX)                  { return MAT(t)->getStaticFriction(); }
 static void  FC mt_setRest(void *t, EDX, NxReal v)        { MAT(t)->setRestitution(v); B2Log("material %u setRestitution(%.3f)", MAT(t)->getMaterialIndex(), v); }
 static float FC mt_getRest(void *t, EDX)                  { return MAT(t)->getRestitution(); }

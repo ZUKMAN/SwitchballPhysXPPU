@@ -27,7 +27,7 @@
 #include "NxCooking.h"
 #include "NxStream.h"
 
-#define B2_VERSION "SwitchballPhysXPPU V22"
+#define B2_VERSION "SwitchballPhysXPPU V23"
 
 #define FC __fastcall
 typedef void *EDX;                       /* the unused edx of __fastcall methods */
