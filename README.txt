@@ -30,3 +30,9 @@ Log: SwitchballPhysXPPU.log. "UNIMPLEMENTED <class> slot N called from X" = a 2.
 game called that the translator does not implement yet.
 
 test284\ - stand-alone test that PhysX 2.8.4 runs on this machine.
+
+tools\recorder25\ - records moving bodies on the ORIGINAL PhysX 2.5 runtime, in the same
+format as TrackMoving=1, to compare the bridge with the original (box pushing etc.):
+    build_recorder25.bat (no SDK needed) -> PhysXLoader.dll
+    game folder: rename the game's original PhysXLoader.dll to PhysXLoader_orig.dll,
+    copy the built PhysXLoader.dll in. Output: recorder25.log. Software levels only.

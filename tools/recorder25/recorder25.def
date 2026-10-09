@@ -1,0 +1,11 @@
+LIBRARY PhysXLoader
+EXPORTS
+    NxCreatePhysicsSDK        = R_NxCreatePhysicsSDK
+    NxCreatePhysicsSDKWithID  = R_NxCreatePhysicsSDKWithID
+    NxReleasePhysicsSDK       = R_NxReleasePhysicsSDK
+    NxGetCookingLib           = R_NxGetCookingLib
+    NxGetCookingLibWithID     = R_NxGetCookingLibWithID
+    NxGetUtilLib              = R_NxGetUtilLib
+    NxGetPhysicsSDK           = R_NxGetPhysicsSDK
+    NxGetFoundationSDK        = R_NxGetFoundationSDK
+    NxGetPhysicsSDKAllocator  = R_NxGetPhysicsSDKAllocator
