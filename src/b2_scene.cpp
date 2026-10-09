@@ -14,6 +14,7 @@ WSdk                g_wsdk;
 int                 g_clothTwoWay = 1;
 int                 g_hwMode = 1;
 int                 g_jointKeepSleep = 1, g_logJoints = 0, g_trackActors = 0, g_jointProjection = -1;
+static int          g_trackMoving = 0;          /* diagnostics: every moving body, every frame */
 static float        g_trackBox[6]; static int g_trackBoxOn;
 float               g_frictionScale = 1.0f; int g_coneFriction = 0;
 float               g_staticFrictionScale = 1.0f;   /* extra factor for static friction only */
@@ -443,6 +444,44 @@ static void TrackActors(WScene *w)
     }
 }
 
+/* diagnostics (TrackMoving=1): every frame, every moving non-kinematic body (and every
+   sleep/wake change) - to see what a pushed box does: stick-slip, rocking, sleeping */
+static void TrackMoving(WScene *w)
+{
+    static NxScene *cur; static unsigned frame, lines;
+    static std::map<NxActor *, int> seen;          /* actor -> last asleep state */
+    if (cur != w->s) { cur = w->s; frame = 0; seen.clear(); }
+    frame++;
+    if (lines > 60000) return;
+    NxU32 n = w->s->getNbActors();
+    NxActor **as = w->s->getActors();
+    for (NxU32 i = 0; i < n; i++) {
+        NxActor *a = as[i];
+        if (!a->isDynamic() || a->readBodyFlag(NX_BF_KINEMATIC)) continue;
+        int asleep = a->isSleeping() ? 1 : 0;
+        NxVec3 v = a->getLinearVelocity(), av = a->getAngularVelocity();
+        std::map<NxActor *, int>::iterator it = seen.find(a);
+        bool changed = it != seen.end() && it->second != asleep;
+        if (it == seen.end()) {
+            seen[a] = asleep;
+            NxShape *s0 = a->getShapes()[0];
+            NxMaterial *mt = w->s->getMaterialFromIndex(s0->getMaterial());
+            B2Log("body %p: %u shapes (first type %d), mass %.3f, linDamp %.3f angDamp %.3f, sleepLin %.3f sleepAng %.3f, "
+                  "iters %u, material %u (static %.2f dynamic %.2f rest %.2f), skin %.4f",
+                  a->userData, a->getNbShapes(), (int)s0->getType(), a->getMass(), a->getLinearDamping(),
+                  a->getAngularDamping(), a->getSleepLinearVelocity(), a->getSleepAngularVelocity(),
+                  a->getSolverIterationCount(), s0->getMaterial(), mt->getStaticFriction(),
+                  mt->getDynamicFriction(), mt->getRestitution(), s0->getSkinWidth());
+        } else it->second = asleep;
+        if (!changed && (asleep || v.magnitudeSquared() < 0.0025f)) continue;   /* < 5 cm/s */
+        NxVec3 p = a->getGlobalPosition();
+        B2Log("mv f%u %p (%u sh) pos %.3f %.3f %.3f vel %.3f %.3f %.3f |%.3f| angvel %.2f %.2f %.2f%s",
+              frame, a->userData, a->getNbShapes(), p.x, p.y, p.z, v.x, v.y, v.z, v.magnitude(),
+              av.x, av.y, av.z, changed ? (asleep ? "  -> ASLEEP" : "  -> AWAKE") : "");
+        lines++;
+    }
+}
+
 static NxU32 FC sc_fetchResults(void *t, EDX, NxU32 st, NxU32 block, NxU32 *err)
 {
     NxU32 r = SC(t)->fetchResults((NxSimulationStatus)st, (block & 0xFF) != 0, err);
@@ -452,6 +491,7 @@ static NxU32 FC sc_fetchResults(void *t, EDX, NxU32 st, NxU32 block, NxU32 *err)
         B2Log("rope settle window over: NX_ADAPTIVE_FORCE back to %.2f", g_defaultAdaptive);
     }
     if (g_trackActors && (r & 0xFF)) TrackActors((WScene *)t);
+    if (g_trackMoving && (r & 0xFF)) TrackMoving((WScene *)t);
     return r;
 }
 static void  FC sc_flushCaches(void *t, EDX)                     { SC(t)->flushCaches(); }
@@ -710,6 +750,7 @@ static void B2Init()
         g_jointKeepSleep = GetPrivateProfileIntA("SwitchballPhysXPPU", "JointKeepSleep", 1, ini);
         g_logJoints      = GetPrivateProfileIntA("SwitchballPhysXPPU", "LogJoints", 0, ini);
         g_trackActors    = GetPrivateProfileIntA("SwitchballPhysXPPU", "TrackActors", 0, ini);
+        g_trackMoving    = GetPrivateProfileIntA("SwitchballPhysXPPU", "TrackMoving", 0, ini);
         {
             char b[16];
             GetPrivateProfileStringA("SwitchballPhysXPPU", "JointProjectionMode", "-1", b, sizeof(b), ini);
